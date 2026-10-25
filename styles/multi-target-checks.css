@@ -1,0 +1,77 @@
+.pf2e-mtc {
+  margin-top: 0.4em;
+  border-top: 1px solid var(--color-border-light-primary, #7a7971);
+  padding-top: 0.3em;
+  font-size: var(--font-size-12, 12px);
+}
+
+.pf2e-mtc .pf2e-mtc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-bottom: 0.2em;
+}
+
+.pf2e-mtc .pf2e-mtc-header a {
+  cursor: pointer;
+}
+
+.pf2e-mtc .pf2e-mtc-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 0.5em;
+  align-items: center;
+  padding: 0.1em 0.2em;
+  border-radius: 3px;
+}
+
+.pf2e-mtc .pf2e-mtc-row:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.pf2e-mtc .pf2e-mtc-name {
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf2e-mtc .pf2e-mtc-row.hidden-token .pf2e-mtc-name {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.pf2e-mtc .pf2e-mtc-dc {
+  opacity: 0.8;
+}
+
+.pf2e-mtc .pf2e-mtc-outcome {
+  font-weight: bold;
+  text-align: right;
+}
+
+.pf2e-mtc .criticalSuccess { color: rgb(0, 128, 0); }
+.pf2e-mtc .success { color: rgb(0, 0, 255); }
+.pf2e-mtc .failure { color: rgb(255, 69, 0); }
+.pf2e-mtc .criticalFailure { color: rgb(255, 0, 0); }
+
+.pf2e-mtc .pf2e-mtc-total {
+  opacity: 0.7;
+  font-size: 0.9em;
+}
+
+.pf2e-mtc .pf2e-mtc-significant {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.pf2e-mtc .pf2e-mtc-sig-ESSENTIAL { text-decoration-color: var(--pf2emm-color-essential, #008000); }
+.pf2e-mtc .pf2e-mtc-sig-HELPFUL { text-decoration-color: var(--pf2emm-color-helpful, #91a82a); }
+.pf2e-mtc .pf2e-mtc-sig-HARMFUL { text-decoration-color: var(--pf2emm-color-harmful, #ff0000); }
+.pf2e-mtc .pf2e-mtc-sig-DETRIMENTAL { text-decoration-color: var(--pf2emm-color-detrimental, #ff852f); }
+
+.pf2e-mtc-sig-text-ESSENTIAL { color: var(--pf2emm-color-essential, #008000); font-weight: bold; }
+.pf2e-mtc-sig-text-HELPFUL { color: var(--pf2emm-color-helpful, #91a82a); }
+.pf2e-mtc-sig-text-HARMFUL { color: var(--pf2emm-color-harmful, #ff0000); }
+.pf2e-mtc-sig-text-DETRIMENTAL { color: var(--pf2emm-color-detrimental, #ff852f); font-weight: bold; }

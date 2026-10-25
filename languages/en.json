@@ -1,0 +1,20 @@
+{
+  "pf2e-multi-target-checks": {
+    "header": "Targets",
+    "dc": "DC {dc}",
+    "ac": "AC {dc}",
+    "vs": "vs. {dc}",
+    "unnamed": "Unknown Creature",
+    "hiddenOutcome": "?",
+    "delta": "{delta} from target-specific modifiers",
+    "unresolved": "Couldn't resolve this target (out of range, or no matching defense)",
+    "adjusted": "Adjusted by {label}",
+    "keybindings": {
+      "separateRolls": {
+        "name": "Hold: Roll Separately per Target",
+        "hint": "While held, a Strike, skill action or spell attack with multiple targets makes one full roll per target (e.g. Whirlwind Strike) instead of resolving one roll against all of them. All Strikes use the same multiple attack penalty."
+      }
+    },
+    "onDefense": "on defense"
+  }
+}
