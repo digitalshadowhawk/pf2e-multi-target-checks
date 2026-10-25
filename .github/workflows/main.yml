@@ -1,0 +1,87 @@
+# GitHub Actions workflow for creating a new FoundryVTT module release.
+#
+# Runs when a GitHub release is *published* (not when one is updated).
+# Tag format: "v1.2.3" or "1.2.3".
+#
+
+name: Create Module Files For GitHub Release
+
+on:
+  release:
+    types: [published]
+
+env:
+  # The URL used for the module's "Project URL" link on FoundryVTT's website.
+  project_url: "https://github.com/${{ github.repository }}"
+  # Always points at the latest manifest; Foundry uses it to check for updates.
+  latest_manifest_url: "https://github.com/${{ github.repository }}/releases/latest/download/module.json"
+  # The archive for this specific release.
+  release_module_url: "https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/module.zip"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Extract Version From Tag
+        id: get_version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag '$TAG' is not a version like v1.2.3"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+
+      - name: Modify Module Manifest With Release-Specific Values
+        run: |
+          jq --arg version  "${{ steps.get_version.outputs.version }}" \
+             --arg url      "${{ env.project_url }}" \
+             --arg manifest "${{ env.latest_manifest_url }}" \
+             --arg download "${{ env.release_module_url }}" \
+             '.version = $version | .url = $url | .manifest = $manifest | .download = $download' \
+             module.json > module.tmp.json
+          mv module.tmp.json module.json
+          cat module.json
+
+      - name: Verify Manifest Paths
+        run: |
+          missing=0
+          for f in $(jq -r '[(.esmodules // [])[], (.scripts // [])[], (.styles // [])[], ((.languages // [])[] | .path)]
+                            | .[] | if type == "object" then .src else . end' module.json); do
+            if [ ! -e "$f" ]; then
+              echo "::error::module.json references '$f', which doesn't exist"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - name: Create Module Archive
+        run: |
+          zip --recurse-paths ./module.zip \
+            module.json \
+            README.md \
+            LICENSE \
+            scripts \
+            styles \
+            templates \
+            languages
+          unzip -l module.zip
+
+      - name: Update Release With Files
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          omitNameDuringUpdate: true
+          omitBodyDuringUpdate: true
+          omitPrereleaseDuringUpdate: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: "./module.json, ./module.zip"
+          tag: ${{ github.event.release.tag_name }}
