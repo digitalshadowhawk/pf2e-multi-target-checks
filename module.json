@@ -2,7 +2,7 @@
   "id": "pf2e-multi-target-checks",
   "title": "PF2e Multi-Target Checks",
   "description": "Resolve a single check roll (Demoralize, Strikes, spell attacks, etc.) against every targeted creature's DC or AC, not just the first target.",
-  "version": "0.5.2",
+  "version": "0.7.0",
   "authors": [
     {
       "name": "Hawk",

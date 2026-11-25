@@ -1,3 +1,8 @@
+# 0.7.0
+Improvements
+- expanded roll breakdowns to show all information, not just when Modifiers Matter triggers
+- breakdowns from messages prior to 0.7.0 may lack certain information that wasn't saved when originally rolled
+
 # 0.6.0
 New Features
 - Added support for Modifiers Matter

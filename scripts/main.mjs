@@ -504,16 +504,16 @@ async function onStatisticCheckRoll(wrapped, args = {}) {
         isBeyondMaxRange(args, selfToken, token)
             ? null
             : wrapped({
-                  ...args,
-                  event: undefined,
-                  callback: undefined,
-                  target: token.actor,
-                  token: selfToken,
-                  modifiers: args.modifiers?.map((m) => m.clone?.() ?? m),
-                  extraRollOptions: [...extra, marker],
-                  skipDialog: true,
-                  createMessage: false,
-              }),
+                ...args,
+                event: undefined,
+                callback: undefined,
+                target: token.actor,
+                token: selfToken,
+                modifiers: args.modifiers?.map((m) => m.clone?.() ?? m),
+                extraRollOptions: [...extra, marker],
+                skipDialog: true,
+                createMessage: false,
+            }),
     );
 
     const primaryId = registerPrimary(probes);
@@ -629,7 +629,6 @@ function buildEntries(message, context, probes) {
     const primaryUuid = context.target?.token ?? null;
     const primaryProbe = probes.find((p) => p.uuid === primaryUuid)?.result;
     const baseModifier = primaryProbe?.totalModifier ?? roll?.options?.totalModifier ?? null;
-    const withMM = !!window.pf2eMm;
 
     return probes.map(({ uuid, result }) => {
         if (uuid === primaryUuid) {
@@ -639,6 +638,7 @@ function buildEntries(message, context, probes) {
                 dc: context.dc?.value ?? result?.dc ?? null,
                 delta: 0,
                 dcModifiers: result?.dcModifiers ?? [],
+                dcMods: result?.dcMods ?? [],
             };
         }
         if (!result || !Number.isFinite(result.dc) || baseModifier === null) {
@@ -650,10 +650,9 @@ function buildEntries(message, context, probes) {
             dc: result.dc,
             delta: result.totalModifier - baseModifier,
             dcModifiers: result.dcModifiers,
+            rollMods: mergeRollMods(message, primaryProbe, result),
+            dcMods: result.dcMods,
         };
-        if (withMM) {
-            entry.mm = { rollMods: mergeRollMods(message, primaryProbe, result), dcMods: result.dcMods };
-        }
         if (result.dosAdjustments.length) {
             entry.dos = result.dosAdjustments;
             entry.options = result.options;
@@ -703,10 +702,12 @@ function getSignificantModifiers(message, entry, result, roll, isAC) {
 
     try {
         if (entry.primary) return mm.getSignificantModifiersOfMessage(message) ?? [];
-        if (!entry.mm) return [];
+        const rollSource = entry.rollMods ?? entry.mm?.rollMods;
+        const dcSource = entry.dcMods ?? entry.mm?.dcMods ?? [];
+        if (!rollSource) return [];
 
-        const rollMods = mm.filterOutIgnoredModifiers(entry.mm.rollMods);
-        let dcMods = mm.filterOutIgnoredModifiers(entry.mm.dcMods);
+        const rollMods = mm.filterOutIgnoredModifiers(rollSource);
+        let dcMods = mm.filterOutIgnoredModifiers(dcSource);
         if (isAC && mm.IGNORED_MODIFIER_SLUGS_FOR_AC_ONLY) {
             dcMods = dcMods.filter((m) => !mm.IGNORED_MODIFIER_SLUGS_FOR_AC_ONLY.has(m.slug));
         }
@@ -733,12 +734,82 @@ function strongestSignificance(significant) {
     return SIGNIFICANCE_ORDER.find((s) => significant.some((m) => m.significance === s)) ?? null;
 }
 
-function significanceTooltipLines(significant) {
-    return significant.map((m) => {
-        const value = m.value > 0 ? `+${m.value}` : String(m.value);
-        const where = m.appliedTo === "dc" ? ` (${localize("onDefense")})` : "";
-        return `<span class="pf2e-mtc-sig-text-${m.significance}">${m.name} ${value}${where}</span>`;
-    });
+/* -------------------------------------------- */
+/*  Breakdown tooltip                           */
+/* -------------------------------------------- */
+
+function getRowRollModifiers(message, entry) {
+    if (entry.primary) {
+        const messageMods = message.flags?.[game.system.id]?.modifiers ?? [];
+        return messageMods.filter((m) => m.enabled && !m.ignored);
+    }
+    return entry.rollMods ?? entry.mm?.rollMods ?? [];
+}
+
+const PERMANENT_DEFENSE_TYPES = new Set(["ability", "proficiency", "item", "potency"]);
+
+function getRowDefenseModifiers(entry) {
+    const full = entry.dcMods?.length ? entry.dcMods : entry.mm?.dcMods;
+    if (!full?.length) return entry.dcModifiers ?? [];
+
+    const contextual = new Set((entry.dcModifiers ?? []).map((m) => `${m.label}:${m.modifier}`));
+    return full.filter(
+        (m) =>
+            m.modifier !== 0 &&
+            (contextual.has(`${m.label}:${m.modifier}`) || (!PERMANENT_DEFENSE_TYPES.has(m.type) && m.slug !== "base")),
+    );
+}
+
+const trimLabel = (label) => game.i18n.localize(label).replace(/(.+) \d+$/, "$1");
+const signed = (value) => (value >= 0 ? `+${value}` : String(value));
+
+function modifierLine(label, value, significance, onDefense) {
+    const css = significance ? ` class="pf2e-mtc-sig-text-${significance}"` : "";
+    const where = onDefense ? ` <span class="pf2e-mtc-tooltip-defense">(${localize("onDefense")})</span>` : "";
+    return `<span${css}>${trimLabel(label)} ${signed(value)}</span>${where}`;
+}
+
+function buildBreakdownTooltip({ message, entry, result, roll, dcText, showDC, showResults, showDetails, significant }) {
+    const lines = [];
+
+    const checkName = message.item?.name ?? null;
+    const header =
+        checkName && showDC && dcText
+            ? `${checkName} ${localize("vs", { dc: dcText })}`
+            : (checkName ?? (showDC ? dcText : ""));
+    if (header) lines.push(`<strong>${header}</strong>`);
+
+    let summary = "";
+    if (showDetails) summary += `(<i class="fa-solid fa-dice-d20"></i> ${getDieResult(roll)}) `;
+    if (showResults) {
+        const outcome = game.i18n.localize(`PF2E.Check.Result.Degree.Check.${result.outcome}`);
+        summary += showDC ? localize("tooltip.withOffset", { outcome, offset: signed(result.total - result.dc) }) : outcome;
+    }
+    if (summary) lines.push(localize("tooltip.result", { result: summary }));
+
+    if (showDetails) {
+        const remaining = [...significant];
+        const takeSignificance = (label, value) => {
+            const index = remaining.findIndex((s) => s.name === label && s.value === value);
+            return index === -1 ? null : remaining.splice(index, 1)[0].significance;
+        };
+
+        for (const m of getRowRollModifiers(message, entry)) {
+            lines.push(modifierLine(m.label, m.modifier, takeSignificance(m.label, m.modifier), false));
+        }
+        for (const m of getRowDefenseModifiers(entry)) {
+            lines.push(modifierLine(m.label, m.modifier, takeSignificance(m.label, m.modifier), true));
+        }
+        for (const s of remaining) {
+            lines.push(modifierLine(s.name, s.value, s.significance, s.appliedTo === "dc"));
+        }
+
+        if (result.adjustment) {
+            lines.push(`<em>${localize("adjusted", { label: game.i18n.localize(result.adjustment) })}</em>`);
+        }
+    }
+
+    return `<div class="pf2e-mtc-tooltip">${lines.map((line) => `<div>${line}</div>`).join("")}</div>`;
 }
 
 
@@ -1035,7 +1106,8 @@ function renderTargets(message, html) {
             hidden,
             showDC: baseShowDC || targetFriendly,
             showResults: baseShowResults || targetFriendly,
-            showSignificant: showBreakdown || mmEveryone || targetFriendly
+            showSignificant: showBreakdown || mmEveryone || targetFriendly,
+            showDetails: showBreakdown || targetFriendly,
         });
     }
     if (!rows.length) return;
@@ -1052,7 +1124,7 @@ function renderTargets(message, html) {
 
     const dcLabelKey = isAC ? "ac" : "dc";
 
-    for (const { tokenDoc, entry, result, hidden, showDC, showResults, showSignificant } of rows) {
+    for (const { tokenDoc, entry, result, hidden, showDC, showResults, showSignificant, showDetails } of rows) {
         const row = document.createElement("div");
         row.classList.add("pf2e-mtc-row");
         if (hidden) row.classList.add("hidden-token");
@@ -1066,8 +1138,7 @@ function renderTargets(message, html) {
         if (showBreakdown && result) {
             totalEl.textContent = String(result.total);
             if (entry.delta) {
-                const signed = entry.delta > 0 ? `+${entry.delta}` : String(entry.delta);
-                totalEl.dataset.tooltip = localize("delta", { delta: signed });
+                totalEl.dataset.tooltip = localize("delta", { delta: signed(entry.delta) });
             }
         }
 
@@ -1075,9 +1146,10 @@ function renderTargets(message, html) {
         dcEl.classList.add("pf2e-mtc-dc");
         const dcText = showDC && result && Number.isFinite(result.dc) ? localize(dcLabelKey, { dc: result.dc }) : "";
         dcEl.textContent = dcText && totalEl.textContent ? localize("vs", { dc: dcText }) : dcText;
-        if (showBreakdown && dcText && entry.dcModifiers?.length) {
-            dcEl.dataset.tooltip = entry.dcModifiers
-                .map((m) => `${game.i18n.localize(m.label)} ${m.modifier > 0 ? "+" : ""}${m.modifier}`)
+        const defenseModifiers = getRowDefenseModifiers(entry);
+        if (showBreakdown && dcText && defenseModifiers.length) {
+            dcEl.dataset.tooltip = defenseModifiers
+                .map((m) => `${game.i18n.localize(m.label)} ${signed(m.modifier)}`)
                 .join("<br>");
         }
 
@@ -1089,19 +1161,21 @@ function renderTargets(message, html) {
         } else if (showResults) {
             outcomeEl.classList.add(result.outcome);
             outcomeEl.textContent = game.i18n.localize(`PF2E.Check.Result.Degree.Check.${result.outcome}`);
-            const tooltip = [];
-            if (result.adjustment && showBreakdown) {
-                tooltip.push(localize("adjusted", { label: game.i18n.localize(result.adjustment) }));
-            }
-
             const significant = showSignificant ? getSignificantModifiers(message, entry, result, roll, isAC) : [];
             const strongest = strongestSignificance(significant);
-            if (strongest) {
-                outcomeEl.classList.add("pf2e-mtc-significant", `pf2e-mtc-sig-${strongest}`);
-                tooltip.push(...significanceTooltipLines(significant));
-            }
+            if (strongest) outcomeEl.classList.add("pf2e-mtc-significant", `pf2e-mtc-sig-${strongest}`);
 
-            if (tooltip.length) outcomeEl.dataset.tooltip = tooltip.join("<br>");
+            outcomeEl.dataset.tooltip = buildBreakdownTooltip({
+                message,
+                entry,
+                result,
+                roll,
+                dcText,
+                showDC,
+                showResults,
+                showDetails,
+                significant,
+            });
         } else {
             outcomeEl.textContent = localize("hiddenOutcome");
         }

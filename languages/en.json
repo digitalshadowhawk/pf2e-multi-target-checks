@@ -15,6 +15,10 @@
         "hint": "While held, a Strike, skill action or spell attack with multiple targets makes one full roll per target (e.g. Whirlwind Strike) instead of resolving one roll against all of them. All Strikes use the same multiple attack penalty."
       }
     },
-    "onDefense": "on defense"
+    "onDefense": "on defense",
+    "tooltip": {
+      "result": "Result: {result}",
+      "withOffset": "{outcome} by {offset}"
+    }
   }
 }

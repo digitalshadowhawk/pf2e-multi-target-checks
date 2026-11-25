@@ -75,3 +75,11 @@
 .pf2e-mtc-sig-text-HELPFUL { color: var(--pf2emm-color-helpful, #91a82a); }
 .pf2e-mtc-sig-text-HARMFUL { color: var(--pf2emm-color-harmful, #ff0000); }
 .pf2e-mtc-sig-text-DETRIMENTAL { color: var(--pf2emm-color-detrimental, #ff852f); font-weight: bold; }
+
+.pf2e-mtc-tooltip {
+  text-align: left;
+}
+.pf2e-mtc-tooltip .pf2e-mtc-tooltip-defense {
+  opacity: 0.7;
+  font-size: 0.9em;
+}
